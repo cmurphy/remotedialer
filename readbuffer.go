@@ -52,6 +52,8 @@ func (r *readBuffer) Offer(reader io.Reader) error {
 		r.offerCount += n
 		return err
 	} else if n > 0 {
+		log("copied %d bytes to read buffer", n)
+		log("current buffer size: %d", r.buf.Len())
 		r.offerCount += n
 		r.cond.Broadcast()
 	}
@@ -80,6 +82,8 @@ func (r *readBuffer) Read(b []byte) (int, error) {
 				// that here.
 				panic("bytes.Buffer returned err=\"" + err.Error() + "\" when buffer length was > 0")
 			}
+			log("read %d bytes into byte slice", n)
+			log("current buffer size: %d", r.buf.Len())
 			r.readCount += int64(n)
 			r.cond.Broadcast()
 			if r.buf.Len() < MaxBuffer/8 {

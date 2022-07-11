@@ -72,11 +72,13 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	session.auth = s.ClientConnectAuthorizer
 	defer s.sessions.remove(session)
 
+	log("starting session serve for request %s", req.URL.Path)
 	code, err := session.Serve(req.Context())
 	if err != nil {
 		// Hijacked so we can't write to the client
 		logrus.Infof("error in remotedialer server [%d]: %v", code, err)
 	}
+	log("finished session serve for request %s", req.URL.Path)
 }
 
 func (s *Server) auth(req *http.Request) (clientKey string, authed, peer bool, err error) {

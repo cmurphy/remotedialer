@@ -9,6 +9,7 @@ import (
 )
 
 func clientDial(ctx context.Context, dialer Dialer, conn *connection, message *message) {
+	log("starting clientDial")
 	defer conn.Close()
 
 	var (
@@ -35,6 +36,7 @@ func clientDial(ctx context.Context, dialer Dialer, conn *connection, message *m
 }
 
 func pipe(client *connection, server net.Conn) {
+	log("starting pipe")
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
@@ -49,11 +51,15 @@ func pipe(client *connection, server net.Conn) {
 
 	go func() {
 		defer wg.Done()
-		_, err := io.Copy(server, client)
+		log("starting copy from client to server")
+		n, err := io.Copy(server, client)
+		log("copied %d bytes", n)
 		close(err)
 	}()
 
-	_, err := io.Copy(client, server)
+	log("starting copy from server to client")
+	n, err := io.Copy(client, server)
+	log("copied %d bytes", n)
 	err = close(err)
 	wg.Wait()
 

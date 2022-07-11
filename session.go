@@ -110,7 +110,9 @@ func (s *Session) Serve(ctx context.Context) (int, error) {
 	}
 
 	for {
+		log("session serve loop")
 		msType, reader, err := s.conn.NextReader()
+		log("got reader for message type %v err %v", msType, err)
 		if err != nil {
 			return 400, err
 		}
@@ -126,10 +128,12 @@ func (s *Session) Serve(ctx context.Context) (int, error) {
 }
 
 func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
+	log("starting Session.serveMessage")
 	message, err := newServerMessage(reader)
 	if err != nil {
 		return err
 	}
+	log("service message type %v", message.messageType)
 
 	if PrintTunnelData {
 		logrus.Debug("REQUEST ", message)
@@ -139,6 +143,7 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 		if s.auth == nil || !s.auth(message.proto, message.address) {
 			return errors.New("connect not allowed")
 		}
+		log("message type Connect - starting client connect")
 		s.clientConnect(ctx, message)
 		return nil
 	}
@@ -247,6 +252,7 @@ func (s *Session) closeConnection(connID int64, err error) {
 }
 
 func (s *Session) clientConnect(ctx context.Context, message *message) {
+	log("starting clientConnect")
 	conn := newConnection(message.connID, s, message.proto, message.address)
 
 	s.Lock()
@@ -256,6 +262,7 @@ func (s *Session) clientConnect(ctx context.Context, message *message) {
 	}
 	s.Unlock()
 
+	log("running clientDial goroutine")
 	go clientDial(ctx, s.dialer, conn, message)
 }
 
@@ -296,6 +303,7 @@ func (s *Session) serverConnectContext(ctx context.Context, proto, address strin
 }
 
 func (s *Session) serverConnect(deadline time.Time, proto, address string) (net.Conn, error) {
+	log("starting serverConnect")
 	connID := atomic.AddInt64(&s.nextConnID, 1)
 	conn := newConnection(connID, s, proto, address)
 
@@ -306,12 +314,14 @@ func (s *Session) serverConnect(deadline time.Time, proto, address string) (net.
 	}
 	s.Unlock()
 
+	log("writing connect message")
 	_, err := s.writeMessage(deadline, newConnect(connID, proto, address))
 	if err != nil {
 		s.closeConnection(connID, err)
 		return nil, err
 	}
 
+	log("returning connection")
 	return conn, err
 }
 

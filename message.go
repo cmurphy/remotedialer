@@ -220,7 +220,7 @@ func (m *message) String() string {
 	switch m.messageType {
 	case Data:
 		if m.body == nil {
-			return fmt.Sprintf("%d DATA         [%d]: %d bytes: %s", m.id, m.connID, len(m.bytes), string(m.bytes))
+			return fmt.Sprintf("%d DATA         [%d]: %d bytes: %s", m.id, m.connID, len(m.bytes), "[redacted]") //string(m.bytes))
 		}
 		return fmt.Sprintf("%d DATA         [%d]: buffered", m.id, m.connID)
 	case Error:
