@@ -21,8 +21,6 @@ const (
 	Error
 	AddClient
 	RemoveClient
-	Pause
-	Resume
 )
 
 var (
@@ -58,22 +56,6 @@ func newMessage(connID int64, bytes []byte) *message {
 		connID:      connID,
 		messageType: Data,
 		bytes:       bytes,
-	}
-}
-
-func newPause(connID int64) *message {
-	return &message{
-		id:          nextid(),
-		connID:      connID,
-		messageType: Pause,
-	}
-}
-
-func newResume(connID int64) *message {
-	return &message{
-		id:          nextid(),
-		connID:      connID,
-		messageType: Resume,
 	}
 }
 
@@ -231,10 +213,6 @@ func (m *message) String() string {
 		return fmt.Sprintf("%d ADDCLIENT    [%s]", m.id, m.address)
 	case RemoveClient:
 		return fmt.Sprintf("%d REMOVECLIENT [%s]", m.id, m.address)
-	case Pause:
-		return fmt.Sprintf("%d PAUSE        [%d]", m.id, m.connID)
-	case Resume:
-		return fmt.Sprintf("%d RESUME       [%d]", m.id, m.connID)
 	}
 	return fmt.Sprintf("%d UNKNOWN[%d]: %d", m.id, m.connID, m.messageType)
 }

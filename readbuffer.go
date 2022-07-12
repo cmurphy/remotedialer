@@ -3,70 +3,51 @@ package remotedialer
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"sync"
 	"time"
-
-	"github.com/sirupsen/logrus"
 )
 
 const (
-	MaxBuffer = 1 << 21
+	MaxBuffer = 1 << 20
 )
 
 type readBuffer struct {
-	id, readCount, offerCount int64
-	cond                      sync.Cond
-	deadline                  time.Time
-	buf                       bytes.Buffer
-	err                       error
-	backPressure              *backPressure
+	cond     sync.Cond
+	deadline time.Time
+	buf      bytes.Buffer
+	err      error
 }
 
-func newReadBuffer(id int64, backPressure *backPressure) *readBuffer {
+func newReadBuffer() *readBuffer {
 	return &readBuffer{
-		id:           id,
-		backPressure: backPressure,
 		cond: sync.Cond{
 			L: &sync.Mutex{},
 		},
 	}
 }
 
-func (r *readBuffer) Status() string {
-	r.cond.L.Lock()
-	defer r.cond.L.Unlock()
-	return fmt.Sprintf("%d/%d", r.readCount, r.offerCount)
-}
-
 func (r *readBuffer) Offer(reader io.Reader) error {
 	r.cond.L.Lock()
 	defer r.cond.L.Unlock()
 
-	if r.err != nil {
-		return r.err
-	}
+	for {
+		if r.err != nil {
+			return r.err
+		}
 
-	if n, err := io.Copy(&r.buf, reader); err != nil {
-		r.offerCount += n
-		return err
-	} else if n > 0 {
-		log("copied %d bytes to read buffer", n)
-		log("current buffer size: %d", r.buf.Len())
-		r.offerCount += n
-		r.cond.Broadcast()
-	}
+		if n, err := io.Copy(&r.buf, reader); err != nil {
+			return err
+		} else if n > 0 {
+			r.cond.Broadcast()
+		}
 
-	if r.buf.Len() > MaxBuffer {
-		r.backPressure.Pause()
-	}
+		if r.buf.Len() < MaxBuffer {
+			return nil
+		}
 
-	if r.buf.Len() > MaxBuffer*2 {
-		logrus.Debugf("remotedialer buffer exceeded id=%d, length: %d", r.id, r.buf.Len())
+		r.cond.Wait()
 	}
-
-	return nil
 }
 
 func (r *readBuffer) Read(b []byte) (int, error) {
@@ -74,31 +55,26 @@ func (r *readBuffer) Read(b []byte) (int, error) {
 	defer r.cond.L.Unlock()
 
 	for {
-		if r.buf.Len() > 0 {
-			n, err := r.buf.Read(b)
-			if err != nil {
-				// The definition of bytes.Buffer is that this will always return nil because
-				// we first checked that bytes.Buffer.Len() > 0. We assume that fact so just assert
-				// that here.
-				panic("bytes.Buffer returned err=\"" + err.Error() + "\" when buffer length was > 0")
-			}
-			log("read %d bytes into byte slice", n)
-			log("current buffer size: %d", r.buf.Len())
-			r.readCount += int64(n)
-			r.cond.Broadcast()
-			if r.buf.Len() < MaxBuffer/8 {
-				r.backPressure.Resume()
-			}
-			return n, nil
-		}
+		var (
+			n   int
+			err error
+		)
 
-		if r.buf.Cap() > MaxBuffer/8 {
-			logrus.Debugf("resetting remotedialer buffer id=%d to zero, old cap %d", r.id, r.buf.Cap())
-			r.buf = bytes.Buffer{}
+		if r.buf.Len() > 0 {
+			n, err = r.buf.Read(b)
+			r.cond.Broadcast()
+			if err != io.EOF {
+				return n, err
+			}
+			// buffer remains to be read
+			if r.err == io.EOF && r.buf.Len() > 0 {
+				return n, nil
+			}
+			return n, r.err
 		}
 
 		if r.err != nil {
-			return 0, r.err
+			return n, r.err
 		}
 
 		now := time.Now()
