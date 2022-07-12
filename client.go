@@ -26,7 +26,7 @@ func ClientConnect(ctx context.Context, wsURL string, headers http.Header, diale
 
 // ConnectToProxy connect to websocket server
 func ConnectToProxy(rootCtx context.Context, proxyURL string, headers http.Header, auth ConnectAuthorizer, dialer *websocket.Dialer, onConnect func(context.Context, *Session) error) error {
-	logrus.WithField("url", proxyURL).Info("Connecting to proxy")
+	logrus.WithField("url", proxyURL).Info("[remotedialer] Connecting to proxy")
 
 	if dialer == nil {
 		dialer = &websocket.Dialer{Proxy: http.ProxyFromEnvironment, HandshakeTimeout: HandshakeTimeOut}

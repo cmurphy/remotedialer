@@ -36,7 +36,9 @@ func (r *readBuffer) Offer(reader io.Reader) error {
 			return r.err
 		}
 
-		if n, err := io.Copy(&r.buf, reader); err != nil {
+		n, err := io.Copy(&r.buf, reader)
+		log("copied %d bytes to read buffer in Offer", n)
+		if err != nil {
 			return err
 		} else if n > 0 {
 			r.cond.Broadcast()
@@ -62,6 +64,7 @@ func (r *readBuffer) Read(b []byte) (int, error) {
 
 		if r.buf.Len() > 0 {
 			n, err = r.buf.Read(b)
+			log("read %d bytes from read buffer in Read", n)
 			r.cond.Broadcast()
 			if err != io.EOF {
 				return n, err
